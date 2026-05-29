@@ -1,0 +1,204 @@
+import * as React from 'react';
+import { Head, router } from '@inertiajs/react';
+import { Download, Plus, Upload } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { ImportDialog } from '@/components/ui/import-dialog';
+import { ServiciosTable } from '@/components/servicios/servicios-table';
+import { ServicioSheet } from '@/components/servicios/servicio-sheet';
+import type { Servicio, ServiciosFilters } from '@/types/servicios';
+
+interface Props {
+    servicios: Servicio[];
+    filters: ServiciosFilters;
+}
+
+export default function AdminServiciosIndex({ servicios, filters }: Props) {
+    const [search, setSearch] = React.useState(filters.search);
+    const [activo, setActivo] = React.useState<ServiciosFilters['activo']>(
+        filters.activo,
+    );
+    const [importOpen, setImportOpen] = React.useState(false);
+    const [sheetOpen, setSheetOpen] = React.useState(false);
+    const [sheetMode, setSheetMode] = React.useState<'create' | 'edit'>(
+        'create',
+    );
+    const [editingServicio, setEditingServicio] = React.useState<
+        Servicio | undefined
+    >(undefined);
+
+    React.useEffect(() => {
+        const t = setTimeout(() => {
+            router.get(
+                '/admin/servicios',
+                { search, activo },
+                { preserveState: true, only: ['servicios'], replace: true },
+            );
+        }, 300);
+        return () => clearTimeout(t);
+    }, [search]);
+
+    function handleActivoChange(v: string) {
+        const val = v as ServiciosFilters['activo'];
+        setActivo(val);
+        router.get(
+            '/admin/servicios',
+            { search, activo: val },
+            { preserveState: true, only: ['servicios'], replace: true },
+        );
+    }
+
+    function openCreate() {
+        setSheetMode('create');
+        setEditingServicio(undefined);
+        setSheetOpen(true);
+    }
+
+    function openEdit(servicio: Servicio) {
+        setSheetMode('edit');
+        setEditingServicio(servicio);
+        setSheetOpen(true);
+    }
+
+    return (
+        <>
+            <Head title="Admin — Servicios" />
+
+            <div className="flex flex-col gap-6 p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                            Servicios
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                            {servicios.length} servicio(s)
+                        </p>
+                    </div>
+
+                    <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-nowrap sm:items-center sm:justify-end">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 sm:flex-none"
+                                >
+                                    <Download className="mr-1.5 h-4 w-4" />
+                                    Exportar
+                                </Button>
+                            </DropdownMenuTrigger>
+
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem asChild>
+                                    <a
+                                        href={`/admin/servicios/export?format=xlsx&search=${encodeURIComponent(search)}&activo=${activo}`}
+                                    >
+                                        Excel (.xlsx)
+                                    </a>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <a
+                                        href={`/admin/servicios/export?format=csv&search=${encodeURIComponent(search)}&activo=${activo}`}
+                                    >
+                                        CSV (.csv)
+                                    </a>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setImportOpen(true)}
+                            className="flex-1 sm:flex-none"
+                        >
+                            <Upload className="mr-1.5 h-4 w-4" />
+                            Importar
+                        </Button>
+
+                        <Button
+                            className="flex-1 bg-rose-600 hover:bg-rose-700 sm:flex-none"
+                            onClick={openCreate}
+                        >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Nuevo servicio
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Filters */}
+                <div className="flex flex-wrap items-center gap-3">
+                    <Input
+                        placeholder="Buscar por nombre o descripción…"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="h-8 w-64"
+                    />
+                    <Select
+                        value={activo || 'todos'}
+                        onValueChange={handleActivoChange}
+                    >
+                        <SelectTrigger className="h-8 w-36">
+                            <SelectValue placeholder="Estado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="todos">Todos</SelectItem>
+                            <SelectItem value="1">Activos</SelectItem>
+                            <SelectItem value="0">Inactivos</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <ServiciosTable
+                    servicios={servicios}
+                    filters={{ search, activo }}
+                    onEdit={openEdit}
+                />
+            </div>
+
+            <ServicioSheet
+                mode={sheetMode}
+                servicio={editingServicio}
+                open={sheetOpen}
+                onOpenChange={setSheetOpen}
+            />
+
+            <ImportDialog
+                open={importOpen}
+                onOpenChange={setImportOpen}
+                config={{
+                    title: 'Importar servicios',
+                    description:
+                        'Sube un archivo Excel o CSV para crear servicios en masa.',
+                    templateUrl: '/admin/servicios/import/template',
+                    inputId: 'servicios-import-file',
+                    columnsHint:
+                        'Columnas: nombre, precio, descripcion, duracion, activo (1/0)',
+                    previewUrl: '/admin/servicios/preview',
+                    revalidateUrl: '/admin/servicios/revalidate',
+                    importRowsUrl: '/admin/servicios/import-rows',
+                }}
+            />
+        </>
+    );
+}
+
+AdminServiciosIndex.layout = {
+    breadcrumbs: [
+        { title: 'Admin', href: '/admin' },
+        { title: 'Servicios', href: '/admin/servicios' },
+    ],
+};
