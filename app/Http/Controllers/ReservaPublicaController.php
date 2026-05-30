@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\ConfirmacionCita;
 use App\Models\Cita;
 use App\Models\Horario;
 use App\Models\Servicio;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -76,6 +78,12 @@ class ReservaPublicaController extends Controller
         ]);
 
         $cita->servicios()->attach($validated['servicios']);
+
+        try {
+            Mail::to($cita->email_invitado)->send(new ConfirmacionCita($cita));
+        } catch (\Exception $e) {
+            logger()->error("No se pudo enviar el correo de confirmación de invitado: " . $e->getMessage());
+        }
 
         return redirect()->route('reservar.estado', $token);
     }

@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\ConfirmacionCita;
 use App\Models\Cita;
 use App\Models\Horario;
 use App\Models\Servicio;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 
 class CitaController extends Controller
@@ -88,6 +90,13 @@ class CitaController extends Controller
         ]);
 
         $cita->servicios()->attach($validated['servicios']);
+
+        try {
+            $cita->load('usuario');
+            Mail::to(auth()->user()->email)->send(new ConfirmacionCita($cita));
+        } catch (\Exception $e) {
+            logger()->error("No se pudo enviar el correo de confirmación de cliente registrado: " . $e->getMessage());
+        }
 
         return redirect()->route('citas.index')
             ->with('success', '¡Cita reservada exitosamente!');

@@ -6,6 +6,7 @@ use App\Exports\CitasExport;
 use App\Exports\CitasTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Imports\CitasImport;
+use App\Mail\ConfirmacionCita;
 use App\Models\Cita;
 use App\Models\Horario;
 use App\Models\Servicio;
@@ -14,6 +15,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Concerns\ToCollection;
@@ -81,6 +83,17 @@ class CitaController extends Controller
         ]);
 
         $cita->servicios()->attach($data['servicios']);
+
+        try {
+            if ($cita->usuarioId) {
+                $cita->load('usuario');
+                if ($cita->usuario && $cita->usuario->email) {
+                    Mail::to($cita->usuario->email)->send(new ConfirmacionCita($cita));
+                }
+            }
+        } catch (\Exception $e) {
+            logger()->error("No se pudo enviar el correo de confirmación de cita interna: " . $e->getMessage());
+        }
 
         return redirect()->back()->with('success', 'Cita creada exitosamente.');
     }
